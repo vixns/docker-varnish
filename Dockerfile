@@ -1,21 +1,30 @@
-FROM vixns/base
-MAINTAINER Stéphane Cottin <stephane.cottin@vixns.com>
+FROM debian:jessie-backports
 
-RUN \
-  export DEBIAN_FRONTEND=noninteractive && \
-  curl -k -s https://repo.varnish-cache.org/GPG-key.txt | apt-key add - && \
-  apt-get update && apt-get install -y apt-transport-https && \
-  echo "deb https://repo.varnish-cache.org/debian jessie varnish-4.1" >> /etc/apt/sources.list && \
-  apt-get update && apt-get -y dist-upgrade && \
-  apt-get -y install varnish && \
-  rm -rf /var/lib/apt/lists/*
+RUN export DEBIAN_FRONTEND=noninteractive \
+  && apt-get update && apt-get install -y --no-install-recommends apt-transport-https git curl ca-certificates \
+  && curl -s https://repo.varnish-cache.org/GPG-key.txt | apt-key add - \
+  && echo "deb https://repo.varnish-cache.org/debian/ jessie varnish-4.1" | \
+     tee -a /etc/apt/sources.list.d/varnish-cache.list \
+  && mkdir /src \
+  && cd /src \
+  && apt-get update \
+  && apt-get -y --no-install-recommends install \
+     varnish varnish-dev build-essential automake libtool python-docutils \
+  && git clone https://github.com/nigoroll/libvmod-dynamic.git \
+  && cd /src/libvmod-dynamic \
+  && ./autogen.sh \
+  && ./configure \
+  && make install \
+  && dpkg --purge varnish-dev build-essential automake libtool python-docutils \
+  && apt-get -y autoremove \
+  && cd / && rm -rf /var/lib/apt/lists/* /src
 
-ENV VCL_CONFIG      /etc/varnish/default.vcl
-ENV STORAGE_BACKEND malloc
-ENV CACHE_SIZE      64m
-ENV TELNET_PORT	    6082
-ENV LISTEN_PORT	    6086
-ENV VARNISHD_PARAMS -p default_ttl=3600 -p default_grace=3600
+ENV VCL_CONFIG=/etc/varnish/default.vcl \
+    STORAGE_BACKEND=malloc \
+    CACHE_SIZE=64m \
+    TELNET_PORT=6082 \
+    LISTEN_PORT=6086 \
+    VARNISHD_PARAMS="-p default_ttl=3600 -p default_grace=3600"
 
 COPY start.sh /start.sh
 CMD ["/start.sh"]
