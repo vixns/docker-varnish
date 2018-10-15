@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Print commands
+set -x
+
+if [ ! -s "$FILE_SITE_VCL" ]; then
+    bash "$FILE_GENERATE_SITE_VCL_SH" > "$FILE_SITE_VCL"
+fi
+
+
+# Start varnish
+exec varnishd -F -f "$FILE_DEFAULT_VCL" -a "${VARNISH_PORT:-"0.0.0.0:80"}" -s "${VARNISH_STORAGE:-"malloc,1G"}"
+
+#exec varnishlog

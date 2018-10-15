@@ -1,0 +1,51 @@
+# gnu build system
+# ----------------
+
+.deps/
+.libs/
+autom4te.cache/
+build-aux/
+build/
+m4/
+
+*.la
+*.lo
+*.log
+*.trs
+Makefile
+Makefile.in
+aclocal.m4
+config.h
+config.h.in
+config.log
+config.status
+configure
+libtool
+stamp-h1
+
+# cc
+# --
+
+*.o
+
+# vcc
+# ---
+
+.vcc_*
+vcc_*_if.c
+vcc_*_if.h
+
+# manual
+# ------
+
+*.rst
+*.pdf
+*.3
+
+# packaging
+# ---------
+
+vmod-querystring-*/
+
+vmod-*.tar.[gx]z
+*.spec

@@ -1,30 +1,72 @@
-FROM debian:jessie-backports
+FROM debian:stretch
 
-RUN export DEBIAN_FRONTEND=noninteractive \
-  && apt-get update && apt-get install -y --no-install-recommends apt-transport-https git curl ca-certificates \
-  && curl -s https://repo.varnish-cache.org/GPG-key.txt | apt-key add - \
-  && echo "deb https://repo.varnish-cache.org/debian/ jessie varnish-4.1" | \
-     tee -a /etc/apt/sources.list.d/varnish-cache.list \
-  && mkdir /src \
-  && cd /src \
-  && apt-get update \
-  && apt-get -y --no-install-recommends install \
-     varnish varnish-dev build-essential automake libtool python-docutils \
-  && git clone https://github.com/nigoroll/libvmod-dynamic.git \
-  && cd /src/libvmod-dynamic \
-  && ./autogen.sh \
-  && ./configure \
-  && make install \
-  && dpkg --purge varnish-dev build-essential automake libtool python-docutils \
-  && apt-get -y autoremove \
-  && cd / && rm -rf /var/lib/apt/lists/* /src
+# INSTALL
+RUN apt-get update && \
+    apt-get install -y \
+    varnish \
+    varnish-modules \
+    git \
+    gettext-base \
+    libcap2-bin \
+    vim \
+    procps \
+    htop
 
-ENV VCL_CONFIG=/etc/varnish/default.vcl \
-    STORAGE_BACKEND=malloc \
-    CACHE_SIZE=64m \
-    TELNET_PORT=6082 \
-    LISTEN_PORT=6086 \
-    VARNISHD_PARAMS="-p default_ttl=3600 -p default_grace=3600"
+# Compile and install varnish vmod 'urlcode'.
+RUN apt-get install -y \
+    wget \
+    dpkg-dev \
+    libtool \
+    m4 \
+    automake \
+    pkg-config \
+    docutils-common \
+    libvarnishapi-dev
+RUN cd /tmp \
+    && mkdir urlcode \
+    && cd urlcode \
+    && wget https://github.com/fastly/libvmod-urlcode/archive/master.tar.gz \
+    && tar -xf master.tar.gz \
+    && cd libvmod-urlcode-master \
+    && sh autogen.sh \
+    && ./configure \
+    && make \
+    && make install \
+    && make check
+COPY libvmod-dynamic /tmp/libvmod-dynamic
+RUN cd /tmp/libvmod-dynamic \
+    && ./autogen.sh \
+    && ./configure \
+    && make install \
+    && cd /tmp \
+    && rm -rf /tmp/libvmod-dynamic libvmod-urlcode-master
+RUN apt-get remove
 
-COPY start.sh /start.sh
-CMD ["/start.sh"]
+
+# BUILD-TIME ENVIRONMENT VARIABLES
+ENV FILE_DEFAULT_VCL "/etc/varnish/default.vcl"
+ENV FILE_SITE_VCL "/etc/varnish/site.vcl"
+ENV PATH_VAR_VARNISH "/var/lib/varnish"
+ENV FILE_GENERATE_SITE_VCL_SH "/etc/varnish/generate-site-vcl.sh"
+ENV RUN_VARNISH "/run-varnish.sh"
+ENV EXEC_VARNISH "exec $RUN_VARNISH"
+
+# RUN-TIME ENVIRONMENT VARIABLES
+ENV VARNISH_CACHE_COOKIE= VARNISH_IGNORE_COOKIE= VARNISH_CACHE_AUTH= VARNISH_IGNORE_AUTH= VARNISH_DEFAULT_TTL=
+
+# Copy files
+COPY default.vcl "$FILE_DEFAULT_VCL"
+COPY generate-site-vcl.sh "$FILE_GENERATE_SITE_VCL_SH"
+
+# PERMISSIONS: PORTS
+RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/sbin/varnishd
+
+# PERMISSIONS: FILES and FOLDERS
+RUN D="$PATH_VAR_VARNISH"  && mkdir -p "$D" && chgrp -R root "$D" && chmod g=u -R "$D"
+RUN F="$FILE_SITE_VCL"     && D="$(dirname "$F")" && mkdir -p "$D" && chmod g=u "$D" && touch "$F"  && chmod g=u "$F" && \
+    F="$FILE_DEFAULT_VCL"  && D="$(dirname "$F")" && mkdir -p "$D" && chmod g=u "$D" && touch "$F"  && chmod g=u "$F"
+
+COPY run "$RUN_VARNISH"
+RUN chmod ug+x "$RUN_VARNISH"
+
+ENTRYPOINT [ "/run-varnish.sh" ]
