@@ -2,9 +2,12 @@ FROM debian:stretch
 
 # INSTALL
 RUN apt-get update && \
+    apt-get install -y curl gnupg apt-transport-https && \
+    curl -L https://packagecloud.io/varnishcache/varnish60lts/gpgkey | apt-key add - && \
+    echo "deb https://packagecloud.io/varnishcache/varnish60lts/debian/ stretch main" > /etc/apt/sources.list.d/varnishcache_varnish60lts.list && \
+    apt-get update && \
     apt-get install -y \
     varnish \
-    varnish-modules \
     git \
     gettext-base \
     libcap2-bin \
@@ -16,12 +19,12 @@ RUN apt-get update && \
 RUN apt-get install -y \
     wget \
     dpkg-dev \
+    varnish-dev \
     libtool \
     m4 \
     automake \
     pkg-config \
-    docutils-common \
-    libvarnishapi-dev
+    docutils-common 
 RUN cd /tmp \
     && mkdir urlcode \
     && cd urlcode \
@@ -30,16 +33,23 @@ RUN cd /tmp \
     && cd libvmod-urlcode-master \
     && sh autogen.sh \
     && ./configure \
+    && sed -i -e "/#include \"vrt.h\"/d" src/vmod_urlcode.c \
     && make \
     && make install \
     && make check
-COPY libvmod-dynamic /tmp/libvmod-dynamic
-RUN cd /tmp/libvmod-dynamic \
+RUN cd /tmp \
+    && git clone https://github.com/nigoroll/libvmod-dynamic.git -b 6.0 \
+    && cd libvmod-dynamic \
     && ./autogen.sh \
     && ./configure \
     && make install \
     && cd /tmp \
     && rm -rf /tmp/libvmod-dynamic libvmod-urlcode-master
+RUN cd /tmp \
+    && git clone https://github.com/varnish/varnish-modules.git \
+    && cd varnish-modules \
+    && ./bootstrap && ./configure && make && make install \
+    && cd /tmp && rm -rf varnish-modules
 RUN apt-get remove
 
 
