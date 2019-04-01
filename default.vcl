@@ -134,11 +134,10 @@ sub vcl_hit {
 }
 
 sub vcl_deliver {
-    remove resp.http.X-Varnish;
-    remove resp.http.Via;
-    remove resp.http.Age;
-    remove resp.http.X-Powered-By;
-    unset obj.http.Server;
+    unset resp.http.X-Varnish;
+    unset resp.http.Via;
+    unset resp.http.Age;
+    unset resp.http.X-Powered-By;
 }
 
 # SITE SPECIFIC
