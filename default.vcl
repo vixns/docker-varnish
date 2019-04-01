@@ -44,7 +44,6 @@ sub vcl_backend_response {
     if(bereq.http.X-Forwarded-Proto == "https" && regsub(beresp.http.Location, "^http://([^/]+)/.*", "\1") == bereq.http.Host ) {
         set beresp.http.Location = regsub(beresp.http.Location, "^http://(.*)", "https://\1");
     }
-    
     # Do not compress already compressed formats
     if (bereq.url ~ "\.(jpg|png|gif|gz|tgz|bz2|tbz|mp3|ogg)$") { 
         set beresp.do_gzip = false;
@@ -135,11 +134,11 @@ sub vcl_hit {
 }
 
 sub vcl_deliver {
-    if(obj.hits > 0) {
-        set resp.http.X-Cache = "HIT";
-    } else {
-        set resp.http.X-Cache = "MISS";
-    }
+    remove resp.http.X-Varnish;
+    remove resp.http.Via;
+    remove resp.http.Age;
+    remove resp.http.X-Powered-By;
+    unset obj.http.Server;
 }
 
 # SITE SPECIFIC
